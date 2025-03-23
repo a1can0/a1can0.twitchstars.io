@@ -2,83 +2,72 @@ name: Ultra-Perf Build
 on:
   push:
     branches:
-      - main  # Trigger on pushes to the main branch
+      - main
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      # Generate HTML
       - name: Generate HTML
         run: |
-          echo "Current directory: $(pwd)"
-          echo "Listing files:"
-          ls -la
-          echo "Installing dependencies..."
           pip install -r requirements.txt
-          echo "Running generate_html.py..."
           python generate_html.py
-          echo "Generated index.html:"
-          cat index.html
 
-      # Try Calibre's image-actions first
+      - name: Prepare Deployment Branch
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan gh-pages
+          git reset --hard
+
       - name: Compress Images to AVIF with Calibre
         id: calibre-optimization
         uses: calibreapp/image-actions@main
-        continue-on-error: true  # Allow fallback if this step fails
+        continue-on-error: true
         with:
           githubToken: ${{ secrets.DEPLOY_TOKEN }}
-          convertToAvif: true  # Convert all images to AVIF format
-          avifQuality: 80      # AVIF quality (0-100, higher is better quality)
-          convertToWebp: false # Skip other formats (WebP, etc.)
-          compressOnly: true   # Only compress, don't resize
-          outputDir: assets/optimized  # Save optimized images here
+          convertToAvif: true
+          avifQuality: 80
+          convertToWebp: false
+          compressOnly: true
+          outputDir: assets/optimized
 
-      # Fallback: Local optimization using optimize.js
       - name: Fallback - Optimize Images Locally
         if: steps.calibre-optimization.outcome == 'failure'
         run: |
-          echo "Calibre optimization failed. Falling back to local optimization..."
           npm install sharp
           mkdir -p assets/optimized
           node optimize.js
         env:
-          INPUT_DIR: assets/original  # Folder containing original images
-          OUTPUT_DIR: assets/optimized  # Folder to save AVIF images
+          INPUT_DIR: assets/original
+          OUTPUT_DIR: assets/optimized
 
-      # Commit and push optimized images
-      - name: Commit and Push Optimized Images
-        continue-on-error: true 
+      - name: Commit and Deploy
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add assets/optimized index.html
-          git commit -m "Optimized images to AVIF"
+          git add -f assets/optimized index.html
+          git commit -m "Deploy site" --allow-empty
           git remote set-url origin https://${{ secrets.DEPLOY_TOKEN }}@github.com/${{ github.repository }}.git
-          git push origin main
+          git push origin gh-pages --force
 
-      # Deploy to GitHub Pages
-      - name: Deploy
+      - name: Verify Deployment
         uses: peaceiris/actions-gh-pages@v4
         with:
-          github_token: ${{ secrets.ACCESS_TOKEN }}  # Use the PAT here
-          publish_dir: ./
-          publish_branch: main  # Explicitly deploy to the main branch
-          full_commit_message: "Deploy to GitHub Pages"
-          user_name: "github-actions[bot]"
-          user_email: "github-actions[bot]@users.noreply.github.com"
+          github_token: ${{ secrets.ACCESS_TOKEN }}
+          publish_branch: gh-pages
+          force_orphan: true
 
   lighthouse:
     runs-on: ubuntu-latest
-    needs: build  # Run after the build job
+    needs: build
     steps:
       - uses: actions/checkout@v4
       - uses: treosh/lighthouse-ci-action@v3
@@ -86,3 +75,6 @@ jobs:
           urls: |
             https://a1can0.github.io/a1can0.twitchstars.io/
           budgetPath: ./lighthouse-budget.json
+          chromeFlags: |
+            --no-sandbox
+            --disable-dev-shm-usage
