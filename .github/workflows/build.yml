@@ -19,8 +19,15 @@ jobs:
       # Generate HTML
       - name: Generate HTML
         run: |
+          echo "Current directory: $(pwd)"
+          echo "Listing files:"
+          ls -la
+          echo "Installing dependencies..."
           pip install -r requirements.txt
+          echo "Running generate_html.py..."
           python generate_html.py
+          echo "Generated index.html:"
+          cat index.html
 
       # Try Calibre's image-actions first
       - name: Compress Images to AVIF with Calibre
