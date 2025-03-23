@@ -1,0 +1,6 @@
+- name: shibuya_kaho
+  url: https://www.twitch.tv/shibuya_kaho
+  image: assets/optimized/shibuya.webp
+- name: sashagrey
+  url: https://www.twitch.tv/sashagrey
+  image: assets/optimized/sasha.webp

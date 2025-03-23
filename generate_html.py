@@ -1,4 +1,11 @@
-<!DOCTYPE html>
+from jinja2 import Template
+import yaml
+import os
+
+with open('_data/creators.yml') as f:
+    creators = yaml.safe_load(f)
+
+template = Template('''<!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
@@ -16,27 +23,17 @@ a{color:inherit;text-decoration:none}
 </head>
 <body>
 <div class="grid">
-
+{% for creator in creators %}
 <article class="entry">
-<a href="https://www.twitch.tv/shibuya_kaho">
-<img src="assets/optimized/shibuya.webp" width="48" height="48" loading="lazy" decoding="async" alt="">
-<span>shibuya_kaho</span>
+<a href="{{ creator.url }}">
+<img src="{{ creator.image }}" width="48" height="48" loading="lazy" decoding="async" alt="">
+<span>{{ creator.name }}</span>
 <svg aria-hidden="true">
 <use href="#icon"/>
 </svg>
 </a>
 </article>
-
-<article class="entry">
-<a href="https://www.twitch.tv/sashagrey">
-<img src="assets/optimized/sasha.webp" width="48" height="48" loading="lazy" decoding="async" alt="">
-<span>sashagrey</span>
-<svg aria-hidden="true">
-<use href="#icon"/>
-</svg>
-</a>
-</article>
-
+{% endfor %}
 </div>
 <svg hidden>
 <symbol id="icon" viewBox="0 0 2400 2800">
@@ -45,3 +42,7 @@ a{color:inherit;text-decoration:none}
 </svg>
 </body>
 </html>
+''')
+
+with open('index.html', 'w') as f:
+    f.write(template.render(creators=creators))
