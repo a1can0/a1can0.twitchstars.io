@@ -49,6 +49,7 @@ jobs:
 
       # Commit and push optimized images
       - name: Commit and Push Optimized Images
+        continue-on-error: true 
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
