@@ -47,11 +47,16 @@ jobs:
           compressOnly: true
           outputDir: assets/optimized
 
+      - name: Set up Node.js for Fallback
+        if: steps.calibre-optimization.outcome == 'failure'
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
       - name: Fallback Image Optimization
         if: steps.calibre-optimization.outcome == 'failure'
         run: |
           npm install sharp
-          mkdir -p assets/optimized
           node scripts/optimize.js
         env:
           INPUT_DIR: assets/original
