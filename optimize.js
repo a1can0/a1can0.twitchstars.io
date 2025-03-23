@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const inputDir = process.env.INPUT_DIR || 'assets/original';
-const outputDir = process.env.OUTPUT_DIR || 'optimized';
+const outputDir = process.env.OUTPUT_DIR || 'assets/optimized';
 
 if (!fs.existsSync(outputDir)) {
   fs.mkdirSync(outputDir, { recursive: true });
