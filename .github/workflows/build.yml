@@ -28,7 +28,7 @@ jobs:
         uses: calibreapp/image-actions@main
         continue-on-error: true  # Allow fallback if this step fails
         with:
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          githubToken: ${{ secrets.DEPLOY_TOKEN }}
           convertToAvif: true  # Convert all images to AVIF format
           avifQuality: 80      # AVIF quality (0-100, higher is better quality)
           convertToWebp: false # Skip other formats (WebP, etc.)
@@ -74,5 +74,5 @@ jobs:
       - uses: treosh/lighthouse-ci-action@v3
         with:
           urls: |
-            https://your-site.io/  # Replace with your actual site URL
+            https://a1can0.github.io/a1can0.twitchstars.io/
           budgetPath: ./lighthouse-budget.json

@@ -23,7 +23,7 @@ jobs:
         uses: calibreapp/image-actions@main
         continue-on-error: true  # Allow fallback if this step fails
         with:
-          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          githubToken: ${{ secrets.DEPLOY_TOKEN }}
           convertToAvif: true  # Convert all images to AVIF format
           avifQuality: 80      # AVIF quality (0-100, higher is better quality)
           convertToWebp: false # Skip other formats (WebP, etc.)
