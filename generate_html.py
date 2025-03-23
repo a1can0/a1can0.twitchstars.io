@@ -1,3 +1,5 @@
+# generate_html.py
+
 from jinja2 import Template
 import yaml
 import os
