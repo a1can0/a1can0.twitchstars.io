@@ -29,24 +29,11 @@ jobs:
           git checkout --orphan gh-pages
           git reset --hard
 
-      - name: Compress Images to AVIF with Calibre
-        id: calibre-optimization
-        uses: calibreapp/image-actions@main
-        continue-on-error: true
-        with:
-          githubToken: ${{ secrets.DEPLOY_TOKEN }}
-          convertToAvif: true
-          avifQuality: 80
-          convertToWebp: false
-          compressOnly: true
-          outputDir: assets/optimized
-
-      - name: Fallback - Optimize Images Locally
-        if: steps.calibre-optimization.outcome == 'failure'
+      - name: Optimize Images
         run: |
           npm install sharp
           mkdir -p assets/optimized
-          node optimize.js
+          node scripts/optimize.js
         env:
           INPUT_DIR: assets/original
           OUTPUT_DIR: assets/optimized
