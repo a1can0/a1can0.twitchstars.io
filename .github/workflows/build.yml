@@ -5,20 +5,47 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      # Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
+
+      # Generate HTML
       - name: Generate HTML
         run: |
           pip install -r requirements.txt
           python generate_html.py
-      - name: Optimize Images
-        uses: calibreapp/image-actions@main
+
+      # Set up Node.js for image optimization
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      # Try image optimization with calibreapp/image-actions
+      - name: Optimize Images (Primary)
+        id: optimize-images
+        uses: calibreapp/image-actions@v3
+        continue-on-error: true  # Allow fallback if this step fails
         with:
           githubToken: ${{ secrets.GITHUB_TOKEN }}
           convertToWebp: true
           webpQuality: 75
+
+      # Fallback: Local image optimization
+      - name: Optimize Images (Fallback)
+        if: steps.optimize-images.outcome == 'failure'
+        run: |
+          echo "Primary optimization failed. Falling back to local optimization..."
+          npm install sharp
+          node optimize.js  # Run local optimization script
+        env:
+          INPUT_DIR: assets/original
+          OUTPUT_DIR: assets/optimized
+
+      # Deploy to GitHub Pages
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         with:
