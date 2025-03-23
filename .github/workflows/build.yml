@@ -3,6 +3,13 @@ on:
   push:
     branches:
       - main
+    paths:
+      - '**.jpg'
+      - '**.jpeg'
+      - '**.png'
+      - '**.webp'
+      - '!assets/optimized/**'  # Exclude optimized images from triggering
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,7 +36,19 @@ jobs:
           git checkout --orphan gh-pages
           git reset --hard
 
-      - name: Optimize Images
+      - name: Compress Images with Calibre
+        id: calibre-optimization
+        uses: calibreapp/image-actions@main
+        continue-on-error: true
+        with:
+          githubToken: ${{ secrets.DEPLOY_TOKEN }}
+          convertToAvif: true
+          avifQuality: 80
+          compressOnly: true
+          outputDir: assets/optimized
+
+      - name: Fallback Image Optimization
+        if: steps.calibre-optimization.outcome == 'failure'
         run: |
           npm install sharp
           mkdir -p assets/optimized
@@ -37,6 +56,7 @@ jobs:
         env:
           INPUT_DIR: assets/original
           OUTPUT_DIR: assets/optimized
+        working-directory: ${{ github.workspace }}  # Ensure root context
 
       - name: Commit and Deploy
         run: |
@@ -45,7 +65,7 @@ jobs:
           git remote set-url origin https://${{ secrets.DEPLOY_TOKEN }}@github.com/${{ github.repository }}.git
           git push origin gh-pages --force
 
-      - name: Verify Deployment
+      - name: Finalize Deployment
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.ACCESS_TOKEN }}
