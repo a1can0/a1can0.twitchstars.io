@@ -4,7 +4,6 @@ on:
     branches:
       - main
     paths:
-      - '**.yml'
       - '**.jpg'
       - '**.jpeg'
       - '**.png'
@@ -39,7 +38,8 @@ jobs:
       - name: Checkout Fallback 3 Permissions Verify
         if: ${{ failure() && steps.checkout.outcome == 'failure' }}
         continue-on-error: true
-        run: echo "GITHUB_WORKSPACE permissions: $(ls -ld $GITHUB_WORKSPACE)"
+        run: |
+          echo "GITHUB_WORKSPACE permissions: $(ls -ld $GITHUB_WORKSPACE)"
 
       - name: Set up Python
         id: python_setup
@@ -208,7 +208,8 @@ jobs:
       - name: Deploy Fallback 1 Token Verify
         if: ${{ failure() && steps.deploy.outcome == 'failure' }}
         continue-on-error: true
-        run: echo "Token prefix: ${GITHUB_TOKEN:0:6}"
+        run: |  
+          echo "Token prefix: ${GITHUB_TOKEN:0:6}"
 
       - name: Deploy Fallback 2 Retry Deployment
         if: ${{ failure() && steps.deploy.outcome == 'failure' }}
