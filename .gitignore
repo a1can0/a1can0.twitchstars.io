@@ -1,0 +1,15 @@
+# .gitignore
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+node_modules/
+.DS_Store
+/temp/
+package-lock.json
+package.json
+beggars/
+pyserve.py
+scaffold.hs
