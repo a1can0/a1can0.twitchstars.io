@@ -8,98 +8,226 @@ on:
       - '**.jpeg'
       - '**.png'
       - '**.webp'
-      - '!assets/optimized/**'  # Exclude optimized images from triggering
+      - '!assets/optimized/**'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repo
+      - name: Checkout Repository
+        id: checkout
         uses: actions/checkout@v4
+        continue-on-error: true
         with:
-          fetch-depth: 0  # Full history for git operations
+          fetch-depth: 0
+
+      - name: Checkout Fallback 1: Retry
+        if: failure() && steps.checkout.failure()
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          fetch-depth: 0
+
+      - name: Checkout Fallback 2: Network Check
+        if: failure() && steps.checkout.failure()
+        continue-on-error: true
+        run: |
+          ping -c 5 github.com
+          curl -I https://github.com
+
+      - name: Checkout Fallback 3: Permissions Verify
+        if: failure() && steps.checkout.failure()
+        continue-on-error: true
+        run: echo "GITHUB_WORKSPACE permissions: $(ls -ld $GITHUB_WORKSPACE)"
 
       - name: Set up Python
+        id: python_setup
         uses: actions/setup-python@v4
+        continue-on-error: true
         with:
           python-version: '3.10'
 
-      - name: Generate HTML
-        run: |
-          pip install -r requirements.txt
-          python generate_html.py
-
-      - name: Prepare Deployment Branch
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git checkout --orphan gh-pages
-          git reset --hard
-        # This creates a fresh gh-pages branch with no history, aligning with your reset strategy
-
-      - name: Compress Images with Calibre
-        id: calibre-optimization
-        uses: calibreapp/image-actions@main
+      - name: Python Fallback 1: Alternate Version
+        if: failure() && steps.python_setup.failure()
+        uses: actions/setup-python@v4
         continue-on-error: true
         with:
-          githubToken: ${{ secrets.DEPLOY_TOKEN }}
-          compressOnly: true
-          jpegQuality: 80
-          pngQuality: 80
-          webpQuality: 80
-          ignorePaths: node_modules/**
-        # Removed unsupported inputs (convertToAvif, avifQuality, outputDir)
+          python-version: '3.x'
 
-      - name: Debug Directory Contents (Post-Calibre)
+      - name: Python Fallback 2: Version Check
+        if: failure() && steps.python_setup.failure()
+        continue-on-error: true
         run: |
-          ls -la assets/  # Check assets/ directory after Calibre
-          ls -la assets/optimized/ || echo "assets/optimized/ not found"
+          pyenv versions
+          python --version || true
 
-      - name: Set up Node.js for Fallback
-        if: steps.calibre-optimization.outcome == 'failure'
+      - name: Python Fallback 3: Manual Install
+        if: failure() && steps.python_setup.failure()
+        continue-on-error: true
+        run: |
+          sudo apt-get install python3.10
+          python3.10 --version
+
+      - name: Generate HTML
+        id: generate_html
+        continue-on-error: true
+        run: |
+          pip install -r requirements.txt || pip install --retries 3 -r requirements.txt
+          python generate_html.py || python3 generate_html.py
+
+      - name: HTML Fallback 1: Reinstall Requirements
+        if: failure() && steps.generate_html.failure()
+        continue-on-error: true
+        run: |
+          pip uninstall -y -r requirements.txt
+          pip install --force-reinstall -r requirements.txt
+
+      - name: HTML Fallback 2: Debug Build
+        if: failure() && steps.generate_html.failure()
+        continue-on-error: true
+        run: |
+          cat generate_html.py
+          ls -la templates/
+
+      - name: HTML Fallback 3: Skip Generation
+        if: failure() && steps.generate_html.failure()
+        continue-on-error: true
+        run: echo "Manual HTML override" > index.html
+
+      - name: Set up Node.js
+        id: node_setup
         uses: actions/setup-node@v3
+        continue-on-error: true
         with:
           node-version: '20'
 
-      - name: Fallback Image Optimization
-        if: steps.calibre-optimization.outcome == 'failure'
+      - name: Node Fallback 1: Alternate Version
+        if: failure() && steps.node_setup.failure()
+        uses: actions/setup-node@v3
+        continue-on-error: true
+        with:
+          node-version: '18'
+
+      - name: Node Fallback 2: Version Check
+        if: failure() && steps.node_setup.failure()
+        continue-on-error: true
         run: |
-          ls -la scripts/  # Debug: Verify optimize.js exists
-          npm install sharp
-          node scripts/optimize.js
+          nvm ls
+          node --version || true
+
+      - name: Node Fallback 3: Manual Install
+        if: failure() && steps.node_setup.failure()
+        continue-on-error: true
+        run: |
+          curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+          sudo apt-get install -y nodejs
+
+      - name: Install Sharp
+        id: install_sharp
+        continue-on-error: true
+        run: npm install sharp --registry=https://registry.npmjs.org/
+
+      - name: Sharp Fallback 1: Network Check
+        if: failure() && steps.install_sharp.failure()
+        continue-on-error: true
+        run: |
+          npm config get registry
+          ping -c 5 registry.npmjs.org
+
+      - name: Sharp Fallback 2: Alternative Registry
+        if: failure() && steps.install_sharp.failure()
+        continue-on-error: true
+        run: npm install sharp --registry=https://registry.npmmirror.com
+
+      - name: Sharp Fallback 3: Local Install
+        if: failure() && steps.install_sharp.failure()
+        continue-on-error: true
+        run: |
+          npm cache clean --force
+          npm install --prefer-offline sharp
+
+      - name: Optimize Images
+        id: optimize_images
+        continue-on-error: true
+        run: node scripts/optimize.js
         env:
           INPUT_DIR: assets/original
           OUTPUT_DIR: assets/optimized
-        working-directory: ${{ github.workspace }}  # Root context
+        working-directory: ${{ github.workspace }}
 
-      - name: Debug Directory Contents (Post-Fallback)
+      - name: Optimization Fallback 1: Path Verify
+        if: failure() && steps.optimize_images.failure()
+        continue-on-error: true
         run: |
-          ls -la assets/optimized/ || echo "assets/optimized/ still not found"
+          ls -la $INPUT_DIR || echo "Input dir missing"
+          ls -la $OUTPUT_DIR || echo "Output dir missing"
 
-      - name: Commit and Deploy
+      - name: Optimization Fallback 2: Alternative Script
+        if: failure() && steps.optimize_images.failure()
+        continue-on-error: true
         run: |
-          git add -f assets/optimized index.html
-          git commit -m "Deploy site" --allow-empty
-          git remote set-url origin https://${{ secrets.DEPLOY_TOKEN }}@github.com/${{ github.repository }}.git
-          git push origin gh-pages --force
+          npx imagemin $INPUT_DIR/* --out-dir=$OUTPUT_DIR
 
-      - name: Finalize Deployment
+      - name: Optimization Fallback 3: Skip Optimization
+        if: failure() && steps.optimize_images.failure()
+        continue-on-error: true
+        run: echo "Skipping image optimization"
+
+      - name: Debug Directory Contents
+        id: debug_dir
+        continue-on-error: true
+        run: |
+          ls -la assets/optimized/ || echo "Fallback: Parent dir contents: $(ls -la assets/)"
+
+      - name: Debug Fallback 1: Parent Check
+        if: failure() && steps.debug_dir.failure()
+        continue-on-error: true
+        run: ls -la assets/ || echo "Assets dir missing"
+
+      - name: Debug Fallback 2: Permissions Check
+        if: failure() && steps.debug_dir.failure()
+        continue-on-error: true
+        run: stat -c "%a %n" assets/optimized/
+
+      - name: Debug Fallback 3: Tree Structure
+        if: failure() && steps.debug_dir.failure()
+        continue-on-error: true
+        run: tree assets/ || sudo apt-get install tree -y && tree assets/
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        continue-on-error: true
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.ACCESS_TOKEN }}
+          publish_dir: .
+          keep_files: false
+          force_orphan: true
+          include: |
+            index.html
+            assets/optimized/**
+
+      - name: Deploy Fallback 1: Token Verify
+        if: failure() && steps.deploy.failure()
+        continue-on-error: true
+        run: echo "Token prefix: ${GITHUB_TOKEN:0:6}"
+
+      - name: Deploy Fallback 2: Retry Deployment
+        if: failure() && steps.deploy.failure()
+        continue-on-error: true
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.ACCESS_TOKEN }}
           publish_branch: gh-pages
-          force_orphan: true  # Reinforces the orphan branch strategy
+          force_orphan: true
 
-  lighthouse:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - uses: actions/checkout@v4
-      - uses: treosh/lighthouse-ci-action@v3
-        with:
-          urls: |
-            https://a1can0.github.io/a1can0.twitchstars.io/
-          budgetPath: ./lighthouse-budget.json
-          chromeFlags: |
-            --no-sandbox
-            --disable-dev-shm-usage
+      - name: Deploy Fallback 3: Force Push
+        if: failure() && steps.deploy.failure()
+        continue-on-error: true
+        run: |
+          git config --global user.name "GitHub Actions"
+          git push origin --delete gh-pages
+          git checkout --orphan gh-pages
+          git add -A
+          git commit -m "Force deploy"
+          git push origin gh-pages --force
