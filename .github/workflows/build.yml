@@ -17,7 +17,7 @@ jobs:
       - name: Checkout Repo
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Full history for git operations
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -35,6 +35,7 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git checkout --orphan gh-pages
           git reset --hard
+        # This creates a fresh gh-pages branch with no history, aligning with your reset strategy
 
       - name: Compress Images with Calibre
         id: calibre-optimization
@@ -42,10 +43,17 @@ jobs:
         continue-on-error: true
         with:
           githubToken: ${{ secrets.DEPLOY_TOKEN }}
-          convertToAvif: true
-          avifQuality: 80
           compressOnly: true
-          outputDir: assets/optimized
+          jpegQuality: 80
+          pngQuality: 80
+          webpQuality: 80
+          ignorePaths: node_modules/**
+        # Removed unsupported inputs (convertToAvif, avifQuality, outputDir)
+
+      - name: Debug Directory Contents (Post-Calibre)
+        run: |
+          ls -la assets/  # Check assets/ directory after Calibre
+          ls -la assets/optimized/ || echo "assets/optimized/ not found"
 
       - name: Set up Node.js for Fallback
         if: steps.calibre-optimization.outcome == 'failure'
@@ -56,12 +64,17 @@ jobs:
       - name: Fallback Image Optimization
         if: steps.calibre-optimization.outcome == 'failure'
         run: |
+          ls -la scripts/  # Debug: Verify optimize.js exists
           npm install sharp
           node scripts/optimize.js
         env:
           INPUT_DIR: assets/original
           OUTPUT_DIR: assets/optimized
-        working-directory: ${{ github.workspace }}  # Ensure root context
+        working-directory: ${{ github.workspace }}  # Root context
+
+      - name: Debug Directory Contents (Post-Fallback)
+        run: |
+          ls -la assets/optimized/ || echo "assets/optimized/ still not found"
 
       - name: Commit and Deploy
         run: |
@@ -75,7 +88,7 @@ jobs:
         with:
           github_token: ${{ secrets.ACCESS_TOKEN }}
           publish_branch: gh-pages
-          force_orphan: true
+          force_orphan: true  # Reinforces the orphan branch strategy
 
   lighthouse:
     runs-on: ubuntu-latest
